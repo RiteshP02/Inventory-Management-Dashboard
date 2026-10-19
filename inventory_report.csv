@@ -1,0 +1,5 @@
+﻿ID,Name,Quantity,Min Stock,Unit Price,Total Value,Status
+1002,"Headphones",40,15,4000.00,160000.00,OK
+1003,"Mouse",25,20,2000.00,50000.00,OK
+1004,"keyboard",21,20,2500.00,52500.00,OK
+,TOTAL INVENTORY VALUE,,,,262500.00,

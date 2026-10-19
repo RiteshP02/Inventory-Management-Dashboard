@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inventory Dashboard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config = { darkMode: 'media' };</script>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 min-h-screen">
+
+<header class="bg-slate-800 text-white shadow border-b border-slate-700">
+  <div class="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1 class="text-xl font-semibold">Inventory Management</h1>
+    </div>
+    <a href="/api/export" class="bg-white text-slate-800 hover:bg-slate-100 text-sm font-medium px-4 py-2 rounded-lg">Export CSV</a>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+
+  <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-4">
+      <p class="text-xs text-slate-500 dark:text-slate-400">Total products</p>
+      <p id="statCount" class="text-2xl font-semibold">0</p>
+    </div>
+    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-4">
+      <p class="text-xs text-slate-500 dark:text-slate-400">Total units</p>
+      <p id="statUnits" class="text-2xl font-semibold">0</p>
+    </div>
+    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-4">
+      <p class="text-xs text-slate-500 dark:text-slate-400">Inventory value</p>
+      <p id="statValue" class="text-2xl font-semibold">0.00</p>
+    </div>
+    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-4">
+      <p class="text-xs text-slate-500 dark:text-slate-400">Low / out of stock</p>
+      <p id="statLow" class="text-2xl font-semibold text-amber-600">0</p>
+    </div>
+  </section>
+
+  <div id="lowBanner" class="hidden bg-amber-50 border border-amber-300 text-amber-900 rounded-xl px-4 py-3 text-sm"></div>
+
+  <section class="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-5">
+    <h2 class="font-semibold mb-3">Add new product</h2>
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
+      <label class="col-span-2 text-xs text-slate-500 dark:text-slate-400">Name
+        <input id="addName" maxlength="63" class="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100" placeholder="e.g. USB-C cable">
+      </label>
+      <label class="text-xs text-slate-500 dark:text-slate-400">Quantity
+        <input id="addQty" type="number" min="0" step="1" value="0" class="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100">
+      </label>
+      <label class="text-xs text-slate-500 dark:text-slate-400">Low-stock alert at
+        <input id="addMin" type="number" min="0" step="1" value="5" class="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100">
+      </label>
+      <label class="text-xs text-slate-500 dark:text-slate-400">Unit price
+        <input id="addPrice" type="number" min="0" step="0.01" value="0" class="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100">
+      </label>
+    </div>
+    <button id="addBtn" class="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-5 py-2 rounded-lg">Add product</button>
+  </section>
+
+  <section class="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-5">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+      <h2 class="font-semibold">Products</h2>
+      <input id="search" placeholder="Search by ID or name..." class="w-64 max-w-full rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100">
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-xs text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+            <th class="py-2 pr-3">ID</th>
+            <th class="py-2 pr-3">Name</th>
+            <th class="py-2 pr-3 text-right">Qty</th>
+            <th class="py-2 pr-3 text-right">Min</th>
+            <th class="py-2 pr-3 text-right">Price</th>
+            <th class="py-2 pr-3 text-right">Value</th>
+            <th class="py-2 pr-3">Status</th>
+            <th class="py-2 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <p id="empty" class="hidden text-center text-slate-500 dark:text-slate-400 py-8 text-sm">No products yet. Add one above.</p>
+  </section>
+</main>
+
+<dialog id="editDlg" class="rounded-xl p-0 w-96 max-w-full backdrop:bg-black/40">
+  <div class="p-5 bg-white text-slate-800">
+    <h3 class="font-semibold mb-3">Edit product <span id="editId" class="text-indigo-600"></span></h3>
+    <div class="space-y-3">
+      <label class="block text-xs text-slate-500">Name
+        <input id="editName" maxlength="63" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900">
+      </label>
+      <div class="grid grid-cols-3 gap-3">
+        <label class="text-xs text-slate-500">Qty
+          <input id="editQty" type="number" min="0" step="1" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900">
+        </label>
+        <label class="text-xs text-slate-500">Alert at
+          <input id="editMin" type="number" min="0" step="1" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900">
+        </label>
+        <label class="text-xs text-slate-500">Price
+          <input id="editPrice" type="number" min="0" step="0.01" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900">
+        </label>
+      </div>
+    </div>
+    <div class="flex justify-end gap-2 mt-5">
+      <button id="editCancel" class="px-4 py-2 text-sm rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700">Cancel</button>
+      <button id="editSave" class="px-4 py-2 text-sm rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white">Save</button>
+    </div>
+  </div>
+</dialog>
+
+<div id="toast" class="fixed bottom-5 right-5 hidden px-4 py-2 rounded-lg text-sm text-white shadow-lg"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+let items = [];
+let editingId = null;
+
+// Escapes HTML special characters so product names cannot inject markup.
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+// Formats a number with thousands separators and exactly two decimals.
+function money(n) { return Number(n).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+
+let toastTimer;
+// Shows a green (success) or red (error) pop-up message for three seconds.
+function toast(msg, ok = true) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.className = 'fixed bottom-5 right-5 px-4 py-2 rounded-lg text-sm text-white shadow-lg ' + (ok ? 'bg-emerald-600' : 'bg-rose-600');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.add('hidden'), 3000);
+}
+
+// Sends a fetch request to the C server, returns the parsed JSON, or null (with a toast) on error.
+async function api(method, url, body) {
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: body ? {'Content-Type': 'application/json'} : undefined,
+      body: body ? JSON.stringify(body) : undefined
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || ('Request failed (' + res.status + ')'));
+    return data;
+  } catch (e) {
+    toast(e.message === 'Failed to fetch' ? 'Cannot reach the C server' : e.message, false);
+    return null;
+  }
+}
+
+// Fetches all items from the server and redraws the dashboard.
+async function load() {
+  const data = await api('GET', '/api/items');
+  if (data) { items = data; render(); }
+}
+
+// Returns the status label and badge colour (out of stock / low stock / in stock) for an item.
+function statusOf(it) {
+  if (it.qty === 0) return {text: 'Out of stock', cls: 'bg-rose-100 text-rose-700'};
+  if (it.qty <= it.min_stock) return {text: 'Low stock', cls: 'bg-amber-100 text-amber-700'};
+  return {text: 'In stock', cls: 'bg-emerald-100 text-emerald-700'};
+}
+
+// Applies the search filter, updates stat cards and the low-stock banner, and rebuilds the table rows.
+function render() {
+  const q = $('search').value.trim().toLowerCase();
+  const shown = items.filter(it => !q || String(it.id).includes(q) || it.name.toLowerCase().includes(q));
+
+  let units = 0, value = 0, low = [];
+  for (const it of items) {
+    units += it.qty;
+    value += it.qty * it.price;
+    if (it.qty <= it.min_stock) low.push(it);
+  }
+  $('statCount').textContent = items.length;
+  $('statUnits').textContent = units.toLocaleString();
+  $('statValue').textContent = money(value);
+  $('statLow').textContent = low.length;
+
+  const banner = $('lowBanner');
+  if (low.length) {
+    banner.classList.remove('hidden');
+    banner.innerHTML = '<strong>Low-stock alert:</strong> ' +
+      low.map(it => esc(it.name) + ' (' + it.qty + ' left)').join(', ');
+  } else banner.classList.add('hidden');
+
+  $('empty').classList.toggle('hidden', shown.length > 0);
+  $('empty').textContent = items.length ? 'No products match your search.' : 'No products yet. Add one above.';
+
+  $('rows').innerHTML = shown.map(it => {
+    const st = statusOf(it);
+    return `<tr class="border-b border-slate-100 dark:border-slate-700">
+      <td class="py-2 pr-3 font-mono text-xs">${it.id}</td>
+      <td class="py-2 pr-3">${esc(it.name)}</td>
+      <td class="py-2 pr-3 text-right font-medium">${it.qty}</td>
+      <td class="py-2 pr-3 text-right text-slate-500 dark:text-slate-400">${it.min_stock}</td>
+      <td class="py-2 pr-3 text-right">${money(it.price)}</td>
+      <td class="py-2 pr-3 text-right">${money(it.qty * it.price)}</td>
+      <td class="py-2 pr-3"><span class="px-2 py-0.5 rounded-full text-xs ${st.cls}">${st.text}</span></td>
+      <td class="py-2 text-right whitespace-nowrap">
+        <button onclick="adjust(${it.id}, -1)" class="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs" title="Remove 1 unit">&minus;1</button>
+        <button onclick="adjust(${it.id}, 1)" class="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs" title="Add 1 unit">+1</button>
+        <button onclick="adjustBy(${it.id})" class="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs">Stock&hellip;</button>
+        <button onclick="openEdit(${it.id})" class="px-2 py-1 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs">Edit</button>
+        <button onclick="removeItem(${it.id})" class="px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs">Delete</button>
+      </td></tr>`;
+  }).join('');
+}
+
+// Adds or removes stock for an item by delta via the server, then reloads.
+async function adjust(id, delta) {
+  const r = await api('POST', `/api/items/${id}/stock`, {delta});
+  if (r) load();
+}
+// Asks the user for a quantity change and validates it before calling adjust().
+async function adjustBy(id) {
+  const v = prompt('Enter a quantity change (e.g. 10 to restock, -3 to sell):');
+  if (v === null) return;
+  const delta = Number(v);
+  if (!Number.isInteger(delta) || delta === 0) { toast('Enter a whole number other than 0', false); return; }
+  adjust(id, delta);
+}
+// Confirms with the user, deletes the item on the server, then reloads.
+async function removeItem(id) {
+  const it = items.find(x => x.id === id);
+  if (!confirm(`Delete "${it ? it.name : id}"? This cannot be undone.`)) return;
+  const r = await api('DELETE', `/api/items/${id}`);
+  if (r) { toast('Product deleted'); load(); }
+}
+
+// Fills the edit dialog with the item's current values and opens it.
+function openEdit(id) {
+  const it = items.find(x => x.id === id);
+  if (!it) return;
+  editingId = id;
+  $('editId').textContent = '#' + id;
+  $('editName').value = it.name;
+  $('editQty').value = it.qty;
+  $('editMin').value = it.min_stock;
+  $('editPrice').value = it.price;
+  $('editDlg').showModal();
+}
+// Closes the edit dialog without saving.
+$('editCancel').onclick = () => $('editDlg').close();
+// Sends the edited values to the server, then closes the dialog and reloads.
+$('editSave').onclick = async () => {
+  const body = {
+    name: $('editName').value,
+    qty: Number($('editQty').value),
+    min_stock: Number($('editMin').value),
+    price: Number($('editPrice').value)
+  };
+  const r = await api('PUT', `/api/items/${editingId}`, body);
+  if (r) { $('editDlg').close(); toast('Product updated'); load(); }
+};
+
+// Sends the new product to the server, clears the form fields and reloads.
+$('addBtn').onclick = async () => {
+  const body = {
+    name: $('addName').value,
+    qty: Number($('addQty').value),
+    min_stock: Number($('addMin').value),
+    price: Number($('addPrice').value)
+  };
+  const r = await api('POST', '/api/items', body);
+  if (r) {
+    toast(`Added "${r.name}" with ID ${r.id}`);
+    $('addName').value = ''; $('addQty').value = 0; $('addPrice').value = 0;
+    load();
+  }
+};
+// Pressing Enter in the name field submits the add form.
+$('addName').addEventListener('keydown', e => { if (e.key === 'Enter') $('addBtn').click(); });
+// Re-renders the table on every keystroke in the search box.
+$('search').addEventListener('input', render);
+
+load();
+</script>
+</body>
+</html>
